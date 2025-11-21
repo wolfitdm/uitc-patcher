@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 class Program
 {
@@ -12,7 +13,7 @@ class Program
     {
         PrintAsciiArt();
         PrintColoredText();
-        
+
         try
         {
             string gamePath = AskForGamePath();
@@ -30,7 +31,7 @@ class Program
             LogException(ex, GetExecutableDirectory());
         }
     }
-    
+
     static void PrintAsciiArt()
     {
         Console.ForegroundColor = ConsoleColor.Red; // Set color to red
@@ -45,7 +46,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         );
         Console.ResetColor(); // Reset color to default
     }
-    
+
     static void PrintColoredText()
     {
         Console.ForegroundColor = ConsoleColor.Cyan; // Set color to cyan
@@ -57,7 +58,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         Console.ResetColor(); // Reset color to default
         Console.WriteLine();
     }
-    
+
     static string AskForGamePath()
     {
         Console.WriteLine("Make sure to point it to your data folder! (e.g. C:\\Users\\paw_beans\\Downloads\\UiTC_v33b_EX_Win_64_Bit\\UiTC_v33b_EX_Win_64_Bit_Data)");
@@ -77,12 +78,24 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
             return null;
         }
     }
-    
+
     static void ModifyAssembly(string gamePath)
     {
         // Construct paths for the DLL and its backup
         string dllPath = Path.Combine(gamePath, @"Managed\Assembly-CSharp.dll");
+
+        if (!File.Exists(dllPath))
+        {
+            Console.WriteLine(dllPath + " not exists!");
+            return;
+        }
+
         string backupFilePath = Path.Combine(gamePath, @"Managed\Assembly-CSharp-Backup.dll");
+
+        if (File.Exists(backupFilePath))
+        {
+            File.Delete(backupFilePath);
+        }
 
         // Load the assembly
         ModuleDefMD module = ModuleDefMD.Load(dllPath);
@@ -92,13 +105,8 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
 
         if (globalObjectsType != null)
         {
-            // Find the static constructor (.cctor) method
-            MethodDef cctorMethod = globalObjectsType.Methods.SingleOrDefault(m => m.Name == ".cctor");
-
-            if (cctorMethod != null)
+            Dictionary<string, string> fieldsWithTypes = new Dictionary<string, string>
             {
-                Dictionary<string, string> fieldsWithTypes = new Dictionary<string, string>
-                {
                     {"showDevDebug", "bool"},
                     {"isDevBuild", "bool"},
                     {"isDebugMode", "bool"},
@@ -108,100 +116,72 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     {"maxLuck", "bool"},
                     {"pregnancyInfoCheat", "bool"},
                     {"cheatsOn", "bool"},
+                    {"isVersionCheats", "bool"},
                     {"isVersionExtended", "bool"},
                     {"enc", "int"},
                     {"showInternalDebug", "bool"},
                     {"isFurries", "bool"},
                     {"isSuperDebugging", "bool"},
-                };
+                    {"allowCumShake", "bool"},
+                    {"stopTimeFlow", "bool"},
+                    {"dontCleanSperm", "bool"},
+                    {"isRandomNPCSize", "bool"},
+                    {"disableScreenFade", "bool"},
+                    {"eyesOverHairs", "bool"},
+                    {"pregnantBelly", "bool"},
+                    {"disablePregnancy", "bool"},
+            };
 
-                List<string> youtubeLinks = new List<string>
-                {
-                    "https://www.youtube.com/watch?v=o9l4EiYFZjg",
-                    "https://www.youtube.com/watch?v=egYUfUo3__k"
-                };
+            Dictionary<string, object> fieldsWithValues = new Dictionary<string, object>
+            {
+            };
 
-                foreach (var kvp in fieldsWithTypes)
-                {
-                    string fieldName = kvp.Key;
-                    string fieldType = kvp.Value;
+            Dictionary<string, FieldDef> fieldsWithDefs = new Dictionary<string, FieldDef>
+            {
+            };
 
-                    FieldDef field = globalObjectsType.Fields.SingleOrDefault(f => f.Name == fieldName);
+            Dictionary<string, string> fieldsWithTypesNew = new Dictionary<string, string>
+            {
+            };
 
-                    if (field != null)
-                    {
-                        if (fieldName == "enc")
-                        {
-                            continue;
-                        }
+            // Find the static constructor (.cctor) method
+            MethodDef cctorMethod = globalObjectsType.Methods.SingleOrDefault(m => m.Name == ".cctor");
 
-                        object fieldValue = AskForInput(fieldName, fieldType);
-
-                        for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
-                        {
-                            Instruction instr = cctorMethod.Body.Instructions[i];
-                            if (instr.OpCode == OpCodes.Ldc_I4_0 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                                cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                                cctorMethod.Body.Instructions[i + 1].Operand == field)
-                            {
-                                instr.OpCode = fieldValue is bool boolValue && boolValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
-                                break;
-                            }
-                            else if (instr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                                cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                                cctorMethod.Body.Instructions[i + 1].Operand == field)
-                            {
-                                if (field.Constant is { } constantValue)
-                                {
-                                    instr.Operand = fieldValue;
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"Invalid constant value for '{fieldName}'. Defaulting to false.");
-                                    instr.Operand = 0;
-                                }
-                                break;
-                            }
-                        }
-
-                        if (fieldName == "isVersionExtended" && fieldValue is bool isVersionExtended && isVersionExtended)
-                        {
-                            FieldDef encField = globalObjectsType.Fields.SingleOrDefault(f => f.Name == "enc");
-                            if (encField != null)
-                            {
-                                int encValue = isVersionExtended ? 76 : 77;
-
-                                for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
-                                {
-                                    Instruction currentInstr = cctorMethod.Body.Instructions[i];
-                                    if (currentInstr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                                        cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                                        cctorMethod.Body.Instructions[i + 1].Operand == encField)
-                                    {
-                                        currentInstr.Operand = encValue;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (fieldName == "isFurries" && fieldValue is bool isFurries && isFurries)
-                        {
-                            OpenRandomYouTubeLink(youtubeLinks);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Field '{fieldName}' not found. The Game Dev removed it.");
-                    }
-                }
-
-                File.Move(dllPath, backupFilePath);
-                module.Write(dllPath);
-            }
-            else
+            if (cctorMethod == null)
             {
                 Console.WriteLine("Static constructor (.cctor) not found.");
+                return;
             }
+
+            foreach (var kvp in fieldsWithTypes)
+            {
+                string fieldName = kvp.Key;
+                string fieldType = kvp.Value;
+                Console.WriteLine(fieldName);
+                Console.WriteLine(fieldType);
+
+                object fieldValue = AskForInput(fieldName, fieldType);
+
+                FieldDef field = globalObjectsType.Fields.SingleOrDefault(f => f.Name == fieldName);
+
+                if (field != null)
+                {
+                    fieldsWithValues.Add(fieldName, fieldValue);
+                    fieldsWithDefs.Add(fieldName, field);
+                    fieldsWithTypesNew.Add(fieldName, fieldType);
+                }
+            }
+
+            List<string> youtubeLinks = new List<string>
+            {
+                    "https://www.youtube.com/watch?v=o9l4EiYFZjg",
+                    "https://www.youtube.com/watch?v=egYUfUo3__k"
+            };
+
+            ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, youtubeLinks);
+            ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, youtubeLinks);
+            File.Move(dllPath, backupFilePath);
+            module.Write(dllPath);
         }
         else
         {
@@ -209,93 +189,220 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         }
     }
 
-    static object AskForInput(string fieldName, string fieldType)
+    static void ModifyMethod(TypeDef globalObjectsType, string methodName, Dictionary<string, string> fieldsWithTypes,  Dictionary<string, object> fieldsWithValues, Dictionary<string, FieldDef> fieldsWithDefs, List<string> youtubeLinks)
     {
-        try
+
+        // Find the static constructor (.cctor) method
+        MethodDef cctorMethod = globalObjectsType.Methods.SingleOrDefault(m => m.Name == methodName);
+
+        if (cctorMethod != null)
         {
-            Console.Write($"Enable {fieldName}? (y/n): ");
-
-            if (fieldType == "bool")
+            foreach (var kvp in fieldsWithTypes)
             {
-                ConsoleKeyInfo key = Console.ReadKey();
-                Console.WriteLine();
+                string fieldName = kvp.Key;
+                string fieldType = kvp.Value;
+                Console.WriteLine(fieldName);
+                Console.WriteLine(fieldType);
 
-                if (key.Key == ConsoleKey.Y)
+                FieldDef field = fieldsWithDefs[fieldName];
+
+                if (field != null)
                 {
-                    return true;
-                }
-                else if (key.Key == ConsoleKey.N)
-                {
-                    return false;
+                    if (fieldName == "enc")
+                    {
+                        continue;
+                    }
+
+                    object fieldValue = fieldsWithValues[fieldName];
+
+                    for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+                    {
+                        Instruction instr = cctorMethod.Body.Instructions[i];
+                        Console.WriteLine(instr.OpCode.ToString());
+                        Console.WriteLine(instr.Operand);
+
+                        if (instr.OpCode == OpCodes.Ldc_I4_0 && i + 1 < cctorMethod.Body.Instructions.Count &&
+                            cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
+                            cctorMethod.Body.Instructions[i + 1].Operand == field)
+                        {
+                            bool boolValue = fieldValue is bool ? (bool)fieldValue : false;
+                            instr.OpCode = boolValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
+                            break;
+                        }
+                        else if (instr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
+                            cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
+                            cctorMethod.Body.Instructions[i + 1].Operand == field)
+                        {
+                            bool constantValue = field.Constant is { };
+                            if (constantValue)
+                            {
+                                instr.Operand = fieldValue;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Invalid constant value for '{fieldName}'. Defaulting to false.");
+                                instr.Operand = 0;
+                            }
+                            break;
+                        }
+                    }
+
+                    if (fieldName == "isVersionExtended" && fieldValue is bool isVersionExtended && isVersionExtended)
+                    {
+                        FieldDef encField = fieldsWithDefs["enc"];
+                        if (encField != null)
+                        {
+                            int encValue = isVersionExtended ? 76 : 77;
+
+                            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+                            {
+                                Instruction currentInstr = cctorMethod.Body.Instructions[i];
+                                if (currentInstr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
+                                    cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
+                                    cctorMethod.Body.Instructions[i + 1].Operand == encField)
+                                {
+                                    currentInstr.Operand = encValue;
+                                }
+                            }
+                        }
+                    }
+
+                    if (fieldName == "isVersionCheats" && fieldValue is bool isVersionCheats && isVersionCheats)
+                    {
+                        FieldDef encField = fieldsWithDefs["enc"];
+                        if (encField != null)
+                        {
+                            int encValue = isVersionCheats ? 76 : 77;
+
+                            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+                            {
+                                Instruction currentInstr = cctorMethod.Body.Instructions[i];
+                                if (currentInstr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
+                                    cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
+                                    cctorMethod.Body.Instructions[i + 1].Operand == encField)
+                                {
+                                    currentInstr.Operand = encValue;
+                                }
+                            }
+                        }
+                    }
+
+                    if (fieldName == "isFurries" && fieldValue is bool isFurries && isFurries)
+                    {
+                        OpenRandomYouTubeLink(youtubeLinks);
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Invalid input. Defaulting to false.");
-                    return false;
+                    Console.WriteLine($"Field '{fieldName}' not found. The Game Dev removed it.");
                 }
             }
-            else if (fieldType == "int")
+        }
+        else
+        {
+            Console.WriteLine("Static constructor (" + methodName +") not found.");
+        }
+    }
+
+    static object AskForInput(string fieldName, string fieldType)
+{
+    try
+    {
+        Console.Write($"Enable {fieldName}? (y/n): ");
+
+        if (fieldType == "bool")
+        {
+            ConsoleKeyInfo key = Console.ReadKey();
+            Console.WriteLine();
+
+            if (key.Key == ConsoleKey.Y)
             {
-                return int.Parse(Console.ReadLine());
+                return true;
+            }
+            else if (key.Key == ConsoleKey.N)
+            {
+                return false;
             }
             else
             {
-                Console.WriteLine($"Unsupported field type: {fieldType}");
-                return null;
+                Console.WriteLine("Invalid input. Defaulting to false.");
+                return false;
             }
         }
-        catch (Exception ex)
+        else if (fieldType == "int")
         {
-            LogException(ex, GetExecutableDirectory());
+            int number = 0;
+            try
+            {
+                number = int.Parse(Console.ReadLine());
+                Console.WriteLine($"the number is: {number}");
+            }
+            catch (FormatException)
+            {
+
+                Console.WriteLine("Invalid input. Defaulting to 0.");
+                number = 0;
+            }
+            return number;
+        }
+        else
+        {
+            Console.WriteLine($"Unsupported field type: {fieldType}");
             return null;
         }
     }
-
-    static void OpenRandomYouTubeLink(List<string> links)
+    catch (Exception ex)
     {
-        try
-        {
-            if (links.Count > 0)
-            {
-                Random random = new Random();
-                int index = random.Next(links.Count);
-                string randomLink = links[index];
+        LogException(ex, GetExecutableDirectory());
+        return null;
+    }
+}
 
-                Process.Start(new ProcessStartInfo(randomLink) { UseShellExecute = true });
-            }
-            else
-            {
-                Console.WriteLine("No YouTube links available. :(");
-            }
-        }
-        catch (Exception ex)
+static void OpenRandomYouTubeLink(List<string> links)
+{
+    try
+    {
+        if (links.Count > 0)
         {
-            LogException(ex, GetExecutableDirectory());
+            Random random = new Random();
+            int index = random.Next(links.Count);
+            string randomLink = links[index];
+
+            Process.Start(new ProcessStartInfo(randomLink) { UseShellExecute = true });
+        }
+        else
+        {
+            Console.WriteLine("No YouTube links available. :(");
         }
     }
-
-    static void LogException(Exception ex, string directory)
+    catch (Exception ex)
     {
-        try
-        {
-            string logFilePath = Path.Combine(directory, "runtime.log");
-            File.WriteAllText(logFilePath, $"Exception: {ex.Message}\nStackTrace: {ex.StackTrace}");
-            Console.WriteLine($"An error occurred. Details logged in {logFilePath}. Please Report this!");
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
-        }
-        catch
-        {
-            Console.WriteLine("An error occurred, and failed to log details. Please Report this!");
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
-        }
+        LogException(ex, GetExecutableDirectory());
     }
+}
 
-    static string GetExecutableDirectory()
+static void LogException(Exception ex, string directory)
+{
+    try
     {
-        return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+        string logFilePath = Path.Combine(directory, "runtime.log");
+        File.WriteAllText(logFilePath, $"Exception: {ex.Message}\nStackTrace: {ex.StackTrace}");
+        Console.WriteLine($"An error occurred. Details logged in {logFilePath}. Please Report this!");
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
     }
+    catch
+    {
+        Console.WriteLine("An error occurred, and failed to log details. Please Report this!");
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
+    }
+}
+
+static string GetExecutableDirectory()
+{
+    return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+}
 }
 
 /*
