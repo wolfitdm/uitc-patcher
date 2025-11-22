@@ -6,11 +6,19 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+//using static System.Net.WebRequestMethods;
 
 class Program
 {
     static void Main()
     {
+        bool mod = modifyAssemblies();
+
+        if (mod)
+        {
+            return;
+        }
+
         PrintAsciiArt();
         PrintColoredText();
 
@@ -59,10 +67,82 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         Console.WriteLine();
     }
 
-    static string AskForGamePath()
+    static string GetParentDir(string path)
     {
+        try
+        {
+            string parentDir = Directory.GetParent(path).FullName;
+            return parentDir;
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
+    }
+
+    static string[] SearchDirectories(string parentDir, string search)
+    {
+        string[] directories = Directory.GetDirectories(parentDir, search, SearchOption.AllDirectories);
+        return directories;
+    }
+
+    static string[] getGamePaths()
+    {
+        string currentDir = Directory.GetCurrentDirectory();
+
+        string parentDir = GetParentDir(currentDir);
+
+
+        string[] directories = SearchDirectories(parentDir, "UiTC_Data");
+        int trys = 0;
+
+        while (directories.Length <= 0 && trys < 7)
+        {
+            parentDir = GetParentDir(currentDir);
+            currentDir = parentDir;
+            directories = SearchDirectories(parentDir, "UiTC_Data");
+            trys++;
+        }
+        return directories;
+    }
+
+    static bool modifyAssemblies()
+    {
+        string[] directories = getGamePaths();
+        bool modify = false;
+        for (int i = 0; i < directories.Length; i++)
+        {
+            modify = true;
+            try
+            {
+                string gamePath = directories[i];
+                if (!string.IsNullOrEmpty(gamePath))
+                {
+                    ModifyAssembly(gamePath, true);
+                }
+                else
+                {
+                    Console.WriteLine("Invalid game path. Exiting...");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogException(ex, GetExecutableDirectory());
+            }
+        }
+        return modify;
+    }
+
+    static string AskForGamePath(bool dontAsk = false)
+    {
+        if (dontAsk)
+        {
+            return null;
+        }
+
         Console.WriteLine("Make sure to point it to your data folder! (e.g. C:\\Users\\paw_beans\\Downloads\\UiTC_v33b_EX_Win_64_Bit\\UiTC_v33b_EX_Win_64_Bit_Data)");
         Console.Write("Enter the path to the game data folder: ");
+        
         string gamePath = Console.ReadLine();
 
         // Remove any trailing slashes or backslashes
@@ -79,7 +159,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         }
     }
 
-    static void ModifyAssembly(string gamePath)
+    static void ModifyAssembly(string gamePath, bool dontAsk = false)
     {
         // Construct paths for the DLL and its backup
         string dllPath = Path.Combine(gamePath, @"Managed\Assembly-CSharp.dll");
@@ -168,7 +248,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                 //Console.WriteLine(fieldName);
                 //Console.WriteLine(fieldType);
 
-                object fieldValue = AskForInput(fieldName, fieldType);
+                object fieldValue = AskForInput(fieldName, fieldType, dontAsk);
 
                 FieldDef field = globalObjectsType.Fields.SingleOrDefault(f => f.Name == fieldName);
 
@@ -304,7 +384,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         return;
     }
 
-static object AskForInput(string fieldName, string fieldType)
+static object AskForInput(string fieldName, string fieldType, bool dontAsk = false)
 {
     if (fieldName == "enc")
     {
@@ -313,10 +393,18 @@ static object AskForInput(string fieldName, string fieldType)
 
     try
     {
-        Console.Write($"Enable {fieldName}? (y/n): ");
+        if (!dontAsk)
+        {
+            Console.Write($"Enable {fieldName}? (y/n): ");
+        }
 
         if (fieldType == "bool")
         {
+            if (dontAsk)
+            {
+                return true;
+            }
+
             ConsoleKeyInfo key = Console.ReadKey();
             Console.WriteLine();
 
@@ -337,6 +425,12 @@ static object AskForInput(string fieldName, string fieldType)
         else if (fieldType == "int")
         {
             int number = 0;
+
+            if (dontAsk)
+            {
+                return 0;
+            }
+
             try
             {
                 number = int.Parse(Console.ReadLine());
