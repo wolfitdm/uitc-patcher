@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Windows;
 //using static System.Net.WebRequestMethods;
 
 class Program
@@ -40,6 +41,16 @@ class Program
         }
     }
 
+    static void WriteToConsole(string message, bool dontAsk = false)
+    {
+        if (dontAsk)
+        {
+            return;
+        }
+
+        Console.WriteLine(message);
+    }
+
     static void PrintAsciiArt()
     {
         Console.ForegroundColor = ConsoleColor.Red; // Set color to red
@@ -62,7 +73,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         Console.ResetColor(); // Reset color to default
         Console.Write(" | by ");
         Console.ForegroundColor = ConsoleColor.Yellow; // Set color to yellow
-        Console.WriteLine("Official-Husko");
+        Console.WriteLine("Official-Husko / wolfitdm");
         Console.ResetColor(); // Reset color to default
         Console.WriteLine();
     }
@@ -90,19 +101,20 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
     {
         string currentDir = Directory.GetCurrentDirectory();
 
-        string parentDir = GetParentDir(currentDir);
+        string parentDir = null;
+        string[] directories = null;
 
-
-        string[] directories = SearchDirectories(parentDir, "UiTC_Data");
         int trys = 0;
+        int maxTrys = 8;
 
-        while (directories.Length <= 0 && trys < 7)
+        do
         {
             parentDir = GetParentDir(currentDir);
             currentDir = parentDir;
             directories = SearchDirectories(parentDir, "UiTC_Data");
             trys++;
-        }
+        } while (directories.Length <= 0 && trys < maxTrys);
+
         return directories;
     }
 
@@ -122,7 +134,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                 }
                 else
                 {
-                    Console.WriteLine("Invalid game path. Exiting...");
+                    WriteToConsole("Invalid game path. Exiting...", true);
                 }
             }
             catch (Exception ex)
@@ -130,6 +142,12 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                 LogException(ex, GetExecutableDirectory());
             }
         }
+
+        if (modify)
+        {
+            modify = ExitOnModifyAssemblies();
+        }
+
         return modify;
     }
 
@@ -166,7 +184,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
 
         if (!File.Exists(dllPath))
         {
-            Console.WriteLine(dllPath + " not exists!");
+            WriteToConsole(dllPath + " not exists!", dontAsk);
             return;
         }
 
@@ -238,7 +256,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
 
             if (cctorMethod == null)
             {
-                Console.WriteLine("Static constructor (.cctor) not found.");
+                WriteToConsole("Static constructor (.cctor) not found.", dontAsk);
                 return;
             }
 
@@ -262,7 +280,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     fieldsWithTypesNew.Add(fieldName, fieldType);
                     fieldsWithDefs2.Add(field, fieldName);
                 } else {
-                    Console.WriteLine($"Field '{fieldName}' not found. The Game Dev removed it.");
+                    WriteToConsole($"Field '{fieldName}' not found. The Game Dev removed it.", dontAsk);
                 }
             }
 
@@ -272,8 +290,8 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     "https://www.youtube.com/watch?v=egYUfUo3__k"
             };
 
-            ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks);
-            ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks);
+            ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks, dontAsk);
+            ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks, dontAsk);
             File.Move(dllPath, backupFilePath);
             module.Write(dllPath);
             Console.WriteLine($"Move: {dllPath} To {backupFilePath}");
@@ -281,11 +299,11 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         }
         else
         {
-            Console.WriteLine("Type not found. Make sure the structure matches.");
+            WriteToConsole("Type not found. Make sure the structure matches.", dontAsk);
         }
     }
 
-    static void ModifyMethod(TypeDef globalObjectsType, string methodName, Dictionary<string, string> fieldsWithTypes,  Dictionary<string, object> fieldsWithValues, Dictionary<string, FieldDef> fieldsWithDefs, Dictionary<FieldDef, string> fieldsWithDefs2, List<string> youtubeLinks)
+    static void ModifyMethod(TypeDef globalObjectsType, string methodName, Dictionary<string, string> fieldsWithTypes,  Dictionary<string, object> fieldsWithValues, Dictionary<string, FieldDef> fieldsWithDefs, Dictionary<FieldDef, string> fieldsWithDefs2, List<string> youtubeLinks, bool dontAsk = false)
     {
         MethodDef cctorMethod = globalObjectsType.Methods.SingleOrDefault(m => m.Name == methodName);
         if (cctorMethod != null)
@@ -341,7 +359,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     }
                     else
                     {
-                        Console.WriteLine($"Invalid constant value for '{fieldName}'. Defaulting to false.");
+                        WriteToConsole($"Invalid constant value for '{fieldName}'. Defaulting to false.", dontAsk);
                         next.Operand = 0;
                     }
                     cctorMethod.Body.Instructions[i - 1] = next;
@@ -382,12 +400,19 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         }
         else
         {
-            Console.WriteLine("Static constructor not found.");
+            WriteToConsole("Static constructor not found.", dontAsk);
         }
 
 
         return;
     }
+
+static bool ExitOnModifyAssemblies()
+{
+       Console.WriteLine("Press enter key to exit or press any other key to continue to the standard exwcution of the program!");
+       ConsoleKeyInfo key = Console.ReadKey();
+       return key.Key == ConsoleKey.Enter;
+}
 
 static object AskForInput(string fieldName, string fieldType, bool dontAsk = false)
 {
