@@ -175,7 +175,10 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         if (File.Exists(backupFilePath))
         {
             File.Delete(backupFilePath);
+            Console.WriteLine($"Delete: {backupFilePath}");
         }
+
+        Console.WriteLine($"Load: {dllPath}");
 
         // Load the assembly
         ModuleDefMD module = ModuleDefMD.Load(dllPath);
@@ -273,6 +276,8 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
             ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks);
             File.Move(dllPath, backupFilePath);
             module.Write(dllPath);
+            Console.WriteLine($"Move: {dllPath} To {backupFilePath}");
+            Console.WriteLine($"Write: {dllPath}");
         }
         else
         {
