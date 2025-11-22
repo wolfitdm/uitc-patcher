@@ -67,7 +67,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
 
         // Remove any trailing slashes or backslashes
         gamePath = gamePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
+        Console.WriteLine("Your gamepath: " + gamePath);
         if (Directory.Exists(gamePath))
         {
             return gamePath;
@@ -110,6 +110,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     {"showDevDebug", "bool"},
                     {"isDevBuild", "bool"},
                     {"isDebugMode", "bool"},
+                    {"showMovePoints", "bool"},
                     {"ignoreChoiceReqs", "bool"},
                     {"overpowerStars", "bool"},
                     {"accessAllClothes", "bool"},
@@ -130,6 +131,7 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     {"eyesOverHairs", "bool"},
                     {"pregnantBelly", "bool"},
                     {"disablePregnancy", "bool"},
+                    {"hidePregnantBelly", "bool"},
             };
 
             Dictionary<string, object> fieldsWithValues = new Dictionary<string, object>
@@ -137,6 +139,10 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
             };
 
             Dictionary<string, FieldDef> fieldsWithDefs = new Dictionary<string, FieldDef>
+            {
+            };
+
+            Dictionary<FieldDef, string> fieldsWithDefs2 = new Dictionary<FieldDef, string>
             {
             };
 
@@ -153,12 +159,14 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                 return;
             }
 
+            FieldDef encField = globalObjectsType.Fields.SingleOrDefault(f => f.Name == "enc");
+
             foreach (var kvp in fieldsWithTypes)
             {
                 string fieldName = kvp.Key;
                 string fieldType = kvp.Value;
-                Console.WriteLine(fieldName);
-                Console.WriteLine(fieldType);
+                //Console.WriteLine(fieldName);
+                //Console.WriteLine(fieldType);
 
                 object fieldValue = AskForInput(fieldName, fieldType);
 
@@ -169,6 +177,9 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     fieldsWithValues.Add(fieldName, fieldValue);
                     fieldsWithDefs.Add(fieldName, field);
                     fieldsWithTypesNew.Add(fieldName, fieldType);
+                    fieldsWithDefs2.Add(field, fieldName);
+                } else {
+                    Console.WriteLine($"Field '{fieldName}' not found. The Game Dev removed it.");
                 }
             }
 
@@ -178,8 +189,8 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
                     "https://www.youtube.com/watch?v=egYUfUo3__k"
             };
 
-            ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, youtubeLinks);
-            ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, youtubeLinks);
+            ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks);
+            ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks);
             File.Move(dllPath, backupFilePath);
             module.Write(dllPath);
         }
@@ -189,123 +200,117 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
         }
     }
 
-    static void ModifyMethod(TypeDef globalObjectsType, string methodName, Dictionary<string, string> fieldsWithTypes,  Dictionary<string, object> fieldsWithValues, Dictionary<string, FieldDef> fieldsWithDefs, List<string> youtubeLinks)
+    static void ModifyMethod(TypeDef globalObjectsType, string methodName, Dictionary<string, string> fieldsWithTypes,  Dictionary<string, object> fieldsWithValues, Dictionary<string, FieldDef> fieldsWithDefs, Dictionary<FieldDef, string> fieldsWithDefs2, List<string> youtubeLinks)
     {
-
-        // Find the static constructor (.cctor) method
         MethodDef cctorMethod = globalObjectsType.Methods.SingleOrDefault(m => m.Name == methodName);
-
         if (cctorMethod != null)
         {
-            foreach (var kvp in fieldsWithTypes)
+            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
             {
-                string fieldName = kvp.Key;
-                string fieldType = kvp.Value;
-                Console.WriteLine(fieldName);
-                Console.WriteLine(fieldType);
-
-                FieldDef field = fieldsWithDefs[fieldName];
-
-                if (field != null)
+                Instruction instr = cctorMethod.Body.Instructions[i];
+                if (instr.OpCode != OpCodes.Stsfld)
                 {
-                    if (fieldName == "enc")
+                    continue;
+                }
+
+                if (i == 0)
+                {
+                    continue;
+                }
+
+                FieldDef field = (FieldDef)instr.Operand;
+                
+                if (!fieldsWithDefs2.ContainsKey(field))
+                {
+                    continue;
+                }
+
+                string fieldName = fieldsWithDefs2[field];
+                
+                if (fieldName == "enc")
+                {
+                    continue;
+                }
+
+                object fieldValue = fieldsWithValues[fieldName];
+                //Console.WriteLine($"{fieldName} {fieldValue}");
+                Instruction next = cctorMethod.Body.Instructions[i - 1];
+                bool is_i40_or_i41 = next.OpCode == OpCodes.Ldc_I4_0 || next.OpCode == OpCodes.Ldc_I4_1;
+                bool is_i4 = next.OpCode == OpCodes.Ldc_I4;
+
+                if (is_i40_or_i41)
+                {
+                    bool boolValue = fieldValue is bool;
+                    if (boolValue)
                     {
-                        continue;
+                        boolValue = (bool)fieldValue;
+                        next.OpCode = boolValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
+                        cctorMethod.Body.Instructions[i - 1] = next;
                     }
-
-                    object fieldValue = fieldsWithValues[fieldName];
-
-                    for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+                    continue;
+                } else if (is_i4)
+                {
+                    if (field.Constant is { } constantValue)
                     {
-                        Instruction instr = cctorMethod.Body.Instructions[i];
-                        Console.WriteLine(instr.OpCode.ToString());
-                        Console.WriteLine(instr.Operand);
-
-                        if (instr.OpCode == OpCodes.Ldc_I4_0 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                            cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                            cctorMethod.Body.Instructions[i + 1].Operand == field)
-                        {
-                            bool boolValue = fieldValue is bool ? (bool)fieldValue : false;
-                            instr.OpCode = boolValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
-                            break;
-                        }
-                        else if (instr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                            cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                            cctorMethod.Body.Instructions[i + 1].Operand == field)
-                        {
-                            bool constantValue = field.Constant is { };
-                            if (constantValue)
-                            {
-                                instr.Operand = fieldValue;
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Invalid constant value for '{fieldName}'. Defaulting to false.");
-                                instr.Operand = 0;
-                            }
-                            break;
-                        }
+                        next.Operand = fieldValue;
                     }
-
-                    if (fieldName == "isVersionExtended" && fieldValue is bool isVersionExtended && isVersionExtended)
+                    else
                     {
-                        FieldDef encField = fieldsWithDefs["enc"];
-                        if (encField != null)
-                        {
-                            int encValue = isVersionExtended ? 76 : 77;
-
-                            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
-                            {
-                                Instruction currentInstr = cctorMethod.Body.Instructions[i];
-                                if (currentInstr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                                    cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                                    cctorMethod.Body.Instructions[i + 1].Operand == encField)
-                                {
-                                    currentInstr.Operand = encValue;
-                                }
-                            }
-                        }
+                        Console.WriteLine($"Invalid constant value for '{fieldName}'. Defaulting to false.");
+                        next.Operand = 0;
                     }
+                    cctorMethod.Body.Instructions[i - 1] = next;
+                    continue;
+                }
 
-                    if (fieldName == "isVersionCheats" && fieldValue is bool isVersionCheats && isVersionCheats)
+                if (fieldName == "isVersionExtended" && fieldValue is bool isVersionExtended && isVersionExtended)
+                {
+                    FieldDef encField = globalObjectsType.Fields.SingleOrDefault(f => f.Name == "enc");
+                    if (encField != null)
                     {
-                        FieldDef encField = fieldsWithDefs["enc"];
-                        if (encField != null)
+                        int encValue = isVersionExtended ? 76 : 77;
+
+                        for (int j = 0; j < cctorMethod.Body.Instructions.Count; j++)
                         {
-                            int encValue = isVersionCheats ? 76 : 77;
-
-                            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+                            Instruction currentInstr = cctorMethod.Body.Instructions[j];
+                            if (currentInstr.OpCode == OpCodes.Ldc_I4 && j + 1 < cctorMethod.Body.Instructions.Count &&
+                                cctorMethod.Body.Instructions[j + 1].OpCode == OpCodes.Stsfld &&
+                                cctorMethod.Body.Instructions[j + 1].Operand == encField)
                             {
-                                Instruction currentInstr = cctorMethod.Body.Instructions[i];
-                                if (currentInstr.OpCode == OpCodes.Ldc_I4 && i + 1 < cctorMethod.Body.Instructions.Count &&
-                                    cctorMethod.Body.Instructions[i + 1].OpCode == OpCodes.Stsfld &&
-                                    cctorMethod.Body.Instructions[i + 1].Operand == encField)
-                                {
-                                    currentInstr.Operand = encValue;
-                                }
+                                currentInstr.Operand = encValue;
                             }
+                            cctorMethod.Body.Instructions[j] = currentInstr;
                         }
-                    }
-
-                    if (fieldName == "isFurries" && fieldValue is bool isFurries && isFurries)
-                    {
-                        OpenRandomYouTubeLink(youtubeLinks);
                     }
                 }
-                else
+
+                if (fieldName == "isFurries" && fieldValue is bool isFurries && isFurries)
                 {
-                    Console.WriteLine($"Field '{fieldName}' not found. The Game Dev removed it.");
+                    OpenRandomYouTubeLink(youtubeLinks);
                 }
+            }
+
+            for (int i = 0; i < cctorMethod.Body.Instructions.Count; i++)
+            {
+                globalObjectsType.Methods.SingleOrDefault(m => m.Name == methodName).Body.Instructions[i] = cctorMethod.Body.Instructions[i];
             }
         }
         else
         {
-            Console.WriteLine("Static constructor (" + methodName +") not found.");
+            Console.WriteLine("Static constructor not found.");
         }
+
+
+        return;
     }
 
-    static object AskForInput(string fieldName, string fieldType)
+static object AskForInput(string fieldName, string fieldType)
 {
+    if (fieldName == "enc")
+    {
+        return 0;
+    }
+
     try
     {
         Console.Write($"Enable {fieldName}? (y/n): ");
