@@ -1,11 +1,13 @@
 ﻿using dnlib.DotNet;
 using dnlib.DotNet.Emit;
+using dnlib.DotNet.Writer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows;
 //using static System.Net.WebRequestMethods;
 
@@ -292,8 +294,97 @@ db    db d888888b d888888b  .o88b.        d8888b.  .d8b.  d888888b  .o88b. db   
 
             ModifyMethod(globalObjectsType, ".cctor", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks, dontAsk);
             ModifyMethod(globalObjectsType, "CheckVersionEXCHBA", fieldsWithTypesNew, fieldsWithValues, fieldsWithDefs, fieldsWithDefs2, youtubeLinks, dontAsk);
+		    // Find the type and the fields to modify
+            //TypeDef characterClothesType = module.Types.SingleOrDefault(t => t.Name == "Character_Clothes_UW");
+			//for(int i = 0; i < characterClothesType.Methods.Count; i++) {
+			//	Console.WriteLine(characterClothesType.Methods[i].Name);
+			//}
+            //MethodDef checkAll = characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckAllClothes_Player");
+            //MethodDef set_hasPantsNow = characterClothesType.Methods.SingleOrDefault(m => m.Name == "set_hasPantsNow");
+            //MethodDef set_hasShirtNow = characterClothesType.Methods.SingleOrDefault(m => m.Name == "set_hasShirtNow");
+            //MethodDef CheckChangedClothes_Player = characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckChangedClothes_Player");
+            //    IL_01da: ldarg.0      // this
+            //  IL_01db: ldc.i4.0
+            //IL_01dc: call instance void Character_Clothes_UW::set_hasShirtNow(bool)
+            // OpCodes.Ldarg_0
+            //   OpCodes.Ldc_I4_1
+            // OpCodes.Call
+            // Add a static method that adds both inputs and the static field
+            // and returns the result
+           /* var someMethod = new MethodDefUser("CheckChangedClothes_Player", MethodSig.CreateInstance(module.CorLibTypes.Void));
+            someMethod.Attributes = dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.HideBySig;
+            someMethod.ImplAttributes = dnlib.DotNet.MethodImplAttributes.IL | dnlib.DotNet.MethodImplAttributes.Managed;
+            MethodDef someMethodDef = characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckChangedClothes_Player");
+            Instruction a = new Instruction();
+            a.OpCode = OpCodes.Ldarg_0;
+            Instruction b = new Instruction();
+            b.OpCode = OpCodes.Ldc_I4_1;
+            Instruction c = new Instruction();
+            c.OpCode = OpCodes.Call;
+            c.Operand = set_hasPantsNow;
+            Instruction d = new Instruction();
+            d.OpCode = OpCodes.Call;
+            d.Operand = set_hasShirtNow;
+            Instruction e = new Instruction();
+            e.OpCode = OpCodes.Ret;
+            Instruction f = new Instruction();
+            f.OpCode = OpCodes.Call;
+            f.Operand = set_hasPantsNow;
+            CilBody cilBody = new CilBody();
+            someMethod.Body = cilBody;
+            someMethod.Body.MaxStack = 8;
+            someMethod.Body.Instructions.Clear();
+            someMethod.Body.Instructions.Add(a);
+            someMethod.Body.Instructions.Add(b);
+            someMethod.Body.Instructions.Add(c);
+            someMethod.Body.Instructions.Add(a);
+            someMethod.Body.Instructions.Add(b);
+            someMethod.Body.Instructions.Add(d);
+            someMethod.Body.Instructions.Add(e);
+            if (someMethodDef == null)
+            {
+                characterClothesType.Methods.Add(someMethod);
+            }
+            CheckChangedClothes_Player.Body.Instructions.Clear();
+            CheckChangedClothes_Player.Body.Instructions.Add(a);
+            CheckChangedClothes_Player.Body.Instructions.Add(b);
+            CheckChangedClothes_Player.Body.Instructions.Add(c);
+            CheckChangedClothes_Player.Body.Instructions.Add(a);
+            CheckChangedClothes_Player.Body.Instructions.Add(b);
+            CheckChangedClothes_Player.Body.Instructions.Add(d);
+            CheckChangedClothes_Player.Body.Instructions.Add(e);
+            someMethodDef = characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckChangedClothes_Player");
+            f.Operand = someMethodDef;
+            CilBody cilBodySec = new CilBody();
+            for (int i = 0; i < checkAll.Body.Instructions.Count; i++)
+            {
+                if (checkAll.Body.Instructions[i].OpCode == OpCodes.Ldarg_1) {
+                    //cilBodySec.Instructions.Add(a);
+                    //cilBodySec.Instructions.Add(f);
+                    cilBodySec.Instructions.Add(a);
+                    cilBodySec.Instructions.Add(b);
+                    cilBodySec.Instructions.Add(c);
+                    cilBodySec.Instructions.Add(a);
+                    cilBodySec.Instructions.Add(b);
+                    cilBodySec.Instructions.Add(d);
+                    cilBodySec.Instructions.Add(checkAll.Body.Instructions[i]);
+                    continue;
+                }
+                cilBodySec.Instructions.Add(checkAll.Body.Instructions[i]);
+                Console.WriteLine("Opcode: " + checkAll.Body.Instructions[i].OpCode);
+                Console.WriteLine("Operand: " + checkAll.Body.Instructions[i].Operand);
+            }
+            checkAll.Body.Instructions.Clear();
+            characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckAllClothes_Player").Body.Instructions.Clear();
+            for (int i = 0; i < cilBodySec.Instructions.Count; i++)
+            {
+                characterClothesType.Methods.SingleOrDefault(m => m.Name == "CheckAllClothes_Player").Body.Instructions.Add(cilBodySec.Instructions[i]);
+            }*/
+
             File.Move(dllPath, backupFilePath);
-            module.Write(dllPath);
+            var options = new ModuleWriterOptions(module);
+            options.MetadataOptions.Flags |= MetadataFlags.KeepOldMaxStack;
+            module.Write(dllPath, options);
             Console.WriteLine($"Move: {dllPath} To {backupFilePath}");
             Console.WriteLine($"Write: {dllPath}");
         }
